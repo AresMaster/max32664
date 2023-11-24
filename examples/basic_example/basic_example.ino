@@ -33,7 +33,7 @@ void setup()
     Serial.println("[DEBUG] Initializing MAX32664");
     uint8_t device_mode;
     uint8_t result = max32664.Begin(device_mode);
-    if (result == MAX32664_ReadStatusByteValue::SUCCESS && device_mode == MAX32664_DeviceOperatingMode::ApplicationMode)
+    if (result == MAX32664_ReadStatusByteValue::SUCCESS_STATUS && device_mode == MAX32664_DeviceOperatingMode::ApplicationMode)
     {
         //We successfully initialized communication with the sensor
         Serial.println("[DEBUG] Sensor started!");
@@ -52,7 +52,7 @@ void setup()
     Serial.println("[DEBUG] Configuring Sensor....");
 
     result = max32664.ConfigureDevice_SensorAndAlgorithm();
-    if(result == MAX32664_ReadStatusByteValue::SUCCESS)
+    if(result == MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     { 
         Serial.println("[DEBUG] Sensor configured.");
     }
@@ -80,7 +80,7 @@ void loop()
     uint8_t read_status = max32664.ReadSensorHubStatus(sensor_hub_status);
 
     //If the read was successful...
-    if (read_status == MAX32664_ReadStatusByteValue::SUCCESS)
+    if (read_status == MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
         //Note: I am purposefully not checking "sensor_hub_status"
         //  to see if the DataRdyBit is set, because I've found that
@@ -92,7 +92,7 @@ void loop()
         read_status = max32664.ReadNumberAvailableSamples(num_available_samples);
 
         //If the read was successful and if there are samples available to read...
-        if (read_status == MAX32664_ReadStatusByteValue::SUCCESS && num_available_samples > 0)
+        if (read_status == MAX32664_ReadStatusByteValue::SUCCESS_STATUS && num_available_samples > 0)
         {
             //Step 2.3: Read the data stored in the FIFO
             for (int i = 0; i < num_available_samples; i++)
@@ -101,7 +101,7 @@ void loop()
                 read_status = max32664.ReadSample_SensorAndAlgorithm(current_sample);
 
                 //If the sample was successfully read...
-                if (read_status == MAX32664_ReadStatusByteValue::SUCCESS)
+                if (read_status == MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
                 {
                     //Output the sample data to over serial communication
                     Serial.print(current_sample.ir);

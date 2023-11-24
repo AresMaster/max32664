@@ -4,8 +4,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#define MAX32664_I2C_ADDRESS_DEFAULT            0x55
-#define MAX32664_COMMAND_DELAY                  3
+#define MAX32664_I2C_ADDRESS_DEFAULT 0x55
+#define MAX32664_COMMAND_DELAY 3
+#define CALIBVECTOR_SIZE 824
 
 struct MAX32664_Data
 {
@@ -21,10 +22,22 @@ struct MAX32664_Data
     uint8_t algorithm_status;
     uint16_t interbeat_interval;
 };
-
-enum MAX32664_ReadStatusByteValue 
+struct MAX32664_Data_VerD
 {
-    SUCCESS = 0x00,
+    uint32_t ir;
+    uint32_t red;
+    uint8_t bp_status;
+    uint8_t progress;
+    uint16_t hr;
+    uint8_t sys_bp;
+    uint8_t dia_bp;
+    uint16_t spo2;
+    uint16_t r_value;
+    uint8_t hr_resting_flag;
+};
+enum MAX32664_ReadStatusByteValue
+{
+    SUCCESS_STATUS = 0x00,
     ERR_UNAVAIL_CMD = 0x01,
     ERR_UNAVAIL_FUNC = 0x02,
     ERR_DATA_FORMAT = 0x03,
@@ -92,53 +105,61 @@ enum MAX32664_OutputModeFormat
     SampleCounterByte_SensorData_And_AlgorithmData = 0x07
 };
 
+enum MAX32664_ConfigrationIndex
+{
+    SystolicBPCalibrationValues = 0x01,
+    DiastolicBPCalibrationValues = 0x02,
+    BPCalibrationData = 0x03,
+    SetDateAndTime = 0x04,
+    SpO2CalibrationCoefficients = 0x06
+};
+
 class ReWire_MAX32664
 {
-    private:
+private:
+    TwoWire *wire_instance;
+    int mfio_pin;
+    int reset_pin;
+    int max32664_i2c_address;
 
-        TwoWire *wire_instance;
-        int mfio_pin;
-        int reset_pin;
-        int max32664_i2c_address;
-            
-    public:
+public:
+    // Constructor
+    ReWire_MAX32664(TwoWire *i2c_instance = &Wire, int pin_mfio = -1, int pin_reset = -1, int i2c_address = MAX32664_I2C_ADDRESS_DEFAULT);
 
-        //Constructor
-        ReWire_MAX32664 (TwoWire *i2c_instance = &Wire, int pin_mfio = -1, int pin_reset = -1, int i2c_address = MAX32664_I2C_ADDRESS_DEFAULT);
+    // Methods
+    void ConfigurePinsAndI2C(TwoWire *i2c_instance = &Wire, int pin_mfio = -1, int pin_reset = -1, int i2c_address = MAX32664_I2C_ADDRESS_DEFAULT);
+    uint8_t Begin(uint8_t &device_mode, TwoWire *i2c_instance, int pin_mfio, int pin_reset, int i2c_address = MAX32664_I2C_ADDRESS_DEFAULT);
+    uint8_t Begin(uint8_t &device_mode);
+    uint8_t ReadSample_SensorAndAlgorithm(MAX32664_Data &sample);
+    uint8_t ConfigureDevice_SensorAndAlgorithm();
+    uint8_t ReadSensorHubStatus(uint8_t &status);
+    uint8_t ReadDeviceMode(uint8_t &device_mode);
+    uint8_t ReadSensorHubVersion(uint8_t &major_version, uint8_t &minor_version, uint8_t &revision_number);
+    uint8_t SetDeviceOperatingMode(MAX32664_DeviceOperatingMode operating_mode);
+    uint8_t SetOutputMode_OutputFormat(MAX32664_OutputModeFormat output_format);
+    uint8_t SetOutputMode_FifoInterruptThreshold(uint8_t interrupt_threshold);
+    uint8_t SetAlgorithmMode_EnableAGC(bool enable);
+    uint8_t EnableSensor(bool enable);
+    uint8_t EnableAlgorithmMode_MaximFast(uint8_t mode);
+    uint8_t ReadNumberAvailableSamples(uint8_t &num_samples);
+    uint8_t ReadOutputFifo(uint8_t *read_buffer, uint8_t read_length);
 
-        //Methods
-        void ConfigurePinsAndI2C (TwoWire *i2c_instance = &Wire, int pin_mfio = -1, int pin_reset = -1, int i2c_address = MAX32664_I2C_ADDRESS_DEFAULT);
-        uint8_t Begin (uint8_t &device_mode, TwoWire *i2c_instance, int pin_mfio, int pin_reset, int i2c_address = MAX32664_I2C_ADDRESS_DEFAULT);
-        uint8_t Begin (uint8_t &device_mode);
+    uint8_t loadSpo2Coefficients(float spo2CalibCoefA, float spo2CalibCoefB, float spo2CalibCoefC);
+    uint8_t setDataTime();
+    uint8_t ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sample);
+    uint8_t ConfigureBPT_SensorAndAlgorithm();
+    
+    //@note maybe as private functions
+    uint8_t loadBPTCalibVector();
+    uint8_t EnableBPT_Algorithm();
 
-    public:
+private:
+    uint8_t read_byte(uint8_t data1, uint8_t data2, uint8_t &return_byte);
+    uint8_t read_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t *read_buffer, uint8_t read_length);
 
-        uint8_t ReadSample_SensorAndAlgorithm (MAX32664_Data &sample);
-
-    public:
-
-        uint8_t ConfigureDevice_SensorAndAlgorithm ();
-
-        uint8_t ReadSensorHubStatus (uint8_t &status);
-        uint8_t ReadDeviceMode (uint8_t &device_mode);
-        uint8_t ReadSensorHubVersion (uint8_t &major_version, uint8_t &minor_version, uint8_t &revision_number);
-        uint8_t SetDeviceOperatingMode (MAX32664_DeviceOperatingMode operating_mode);
-        uint8_t SetOutputMode_OutputFormat (MAX32664_OutputModeFormat output_format);
-        uint8_t SetOutputMode_FifoInterruptThreshold (uint8_t interrupt_threshold);
-        uint8_t SetAlgorithmMode_EnableAGC (bool enable);
-        uint8_t EnableSensor (bool enable);
-        uint8_t EnableAlgorithmMode_MaximFast (uint8_t mode);
-        uint8_t ReadNumberAvailableSamples (uint8_t &num_samples);
-        uint8_t ReadOutputFifo (uint8_t *read_buffer, uint8_t read_length);
-
-    private:
-
-        uint8_t read_byte (uint8_t data1, uint8_t data2, uint8_t &return_byte);
-        uint8_t read_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t *read_buffer, uint8_t read_length);        
-
-        uint8_t write_byte (uint8_t data1, uint8_t data2, uint8_t data3);
-        uint8_t write_byte_with_custom_cmd_delay (uint8_t data1, uint8_t data2, uint8_t data3, uint8_t cmd_delay);
-        
-};
+    uint8_t write_byte(uint8_t data1, uint8_t data2, uint8_t data3);
+    uint8_t write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t cmd_delay);
+    uint8_t write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint8_t buffer_size);
+    };
 
 #endif /* __REWIRE_MAX32664_H */
