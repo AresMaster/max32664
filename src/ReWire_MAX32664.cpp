@@ -406,7 +406,7 @@ uint8_t ReWire_MAX32664::write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t
     return status_byte;
 }
 
-uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint8_t buffer_size)
+uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size)
 {
     wire_instance->beginTransmission(max32664_i2c_address);
     wire_instance->write(data1);
@@ -464,9 +464,9 @@ uint8_t ReWire_MAX32664::loadSpo2Coefficients(float spo2CalibCoefA, float spo2Ca
     return status;
 }
 
-uint8_t ReWire_MAX32664::EnableBPT_Algorithm()
+uint8_t ReWire_MAX32664::EnableBPT_Algorithm(uint8_t mode)
 {
-    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x04, 0x02, 40 + 20);
+    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x04, mode, 20);
 }
 
 uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sample)
@@ -505,8 +505,8 @@ uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sa
     sample.bp_status = read_buffer[12];
     sample.progress = read_buffer[13];
     sample.hr = hr;
-    uint8_t sample.sys_bp = read_buffer[16];
-    uint8_t sample.dia_bp = read_buffer[17];
+    sample.sys_bp = read_buffer[16];
+    sample.dia_bp = read_buffer[17];
     sample.spo2 = spo2;
     sample.r_value = r_value;
     sample.hr_resting_flag = read_buffer[22];
@@ -523,6 +523,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     uint8_t status_byte = loadBPTCalibVector();
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("CALIB VECTOR\r\n");
         return status_byte;
     }
     delay(10);
@@ -536,6 +537,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     status_byte = setDataTime();
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("DATA TIME\r\n");
         return status_byte;
     }
     delay(10);
@@ -545,6 +547,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     status_byte = loadSpo2Coefficients(1.5958422, -34.659664, 112.68987); //@note Default values from documentation (change)
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("SPO2\r\n");
         return status_byte;
     }
     delay(10);
@@ -557,6 +560,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("OUTPUT FORMAT\r\n");
         return status_byte;
     }
 
@@ -567,6 +571,8 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("FIFO INTERRUPT\r\n");
+
         return status_byte;
     }
 
@@ -577,6 +583,8 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("ENABLE AGC\r\n");
+
         return status_byte;
     }
 
@@ -587,11 +595,81 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("ENABLE SENSOR\r\n");
+
         return status_byte;
     }
 
-    // Step 1.11: Enable the HR/SpO2 algorithm.
-    status_byte = EnableBPT_Algorithm(0x01);
+    // Step 1.11: Enable the BPT Estimation algorithm.
+    status_byte = EnableBPT_Algorithm(0x02);
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE BPT ALGO\r\n");
+    }
+        delay(100);
+
+    // Return the result of the final operation
+    return status_byte;
+}
+
+uint8_t ReWire_MAX32664::ConfigureBPT_RawValue()
+{
+    // In this function, we are following the steps outlined in Table 8 (section 3.2) of
+    //   the document "measuring-heart-rate-and-spo2-using-the-max32664a.pdf".
+
+    // Step 1.7: Set output mode to sensor + algorithm data
+    //(streamed data will include PPG and algorithm data).
+    uint8_t status_byte = SetOutputMode_OutputFormat(MAX32664_OutputModeFormat::SensorData);
+    delay(10);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("OUTPUT FORMAT\r\n");
+        return status_byte;
+    }
+
+    // Step 1.8: Set sensor hub interrupt threshold to 0x0F (the value used in the datasheet example).
+    status_byte = SetOutputMode_FifoInterruptThreshold(0x0F);
+    delay(10);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("FIFO INTERRUPT\r\n");
+
+        return status_byte;
+    }
+
+    // Step 1.10: Enable the AFE ("analog front end" - the MAX30101 in this case)
+    status_byte = EnableSensor(true);
+    delay(1);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE SENSOR\r\n");
+
+        return status_byte;
+    }
+
+    // Step 1.11: Enable the BPT Estimation algorithm.
+    status_byte = EnableBPT_Algorithm(0x02);
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE BPT ALGO\r\n");
+    }
+     // Step 1.9: Enable the AGC (automatic gain control)
+    status_byte = SetAlgorithmMode_EnableAGC(false);
+   
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE AGC\r\n");
+
+        return status_byte;
+    }
+
     delay(100);
 
     // Return the result of the final operation

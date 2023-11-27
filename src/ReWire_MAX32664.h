@@ -148,10 +148,12 @@ public:
     uint8_t setDataTime();
     uint8_t ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sample);
     uint8_t ConfigureBPT_SensorAndAlgorithm();
+    uint8_t ConfigureBPT_RawValue();
+
     
     //@note maybe as private functions
     uint8_t loadBPTCalibVector();
-    uint8_t EnableBPT_Algorithm();
+    uint8_t EnableBPT_Algorithm(uint8_t mode);
 
 private:
     uint8_t read_byte(uint8_t data1, uint8_t data2, uint8_t &return_byte);
@@ -159,7 +161,7 @@ private:
 
     uint8_t write_byte(uint8_t data1, uint8_t data2, uint8_t data3);
     uint8_t write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t cmd_delay);
-    uint8_t write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint8_t buffer_size);
+    uint8_t write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size);
     };
 
 #endif /* __REWIRE_MAX32664_H */
