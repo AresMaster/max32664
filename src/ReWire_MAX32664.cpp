@@ -421,7 +421,7 @@ uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint
 
     wire_instance->requestFrom(max32664_i2c_address, 1);
     uint8_t status_byte = wire_instance->read();
-    return status_byte;
+        return status_byte;
 }
 
 uint8_t ReWire_MAX32664::loadBPTCalibVector()
@@ -575,7 +575,15 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
         return status_byte;
     }
 
-    
+    // Step 1.9: Enable the AGC (automatic gain control)
+    status_byte = SetAlgorithmMode_EnableAGC(false);
+    delay(200);
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE AGC\r\n");
+
+        return status_byte;
+    }
 
     // Step 1.10: Enable the AFE ("analog front end" - the MAX30101 in this case)
     status_byte = EnableSensor(true);
@@ -604,15 +612,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
         printf("ENABLE BPT\r\n");
     }
     delay(100);
-    // Step 1.9: Enable the AGC (automatic gain control)
-    status_byte = SetAlgorithmMode_EnableAGC(false);
-    delay(200);
-    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
-    {
-        printf("ENABLE AGC\r\n");
-
-        return status_byte;
-    }
+   
     // Return the result of the final operation
     return status_byte;
 }
