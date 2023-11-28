@@ -149,8 +149,11 @@ public:
     uint8_t ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sample);
     uint8_t ConfigureBPT_SensorAndAlgorithm();
     uint8_t ConfigureBPT_RawValue();
+    uint8_t ReadSample_BPTSensor(MAX32664_Data_VerD &sample);
+    uint8_t getMCUType(uint8_t &return_byte);
+    uint8_t read_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data_3, uint8_t *read_buffer, uint16_t read_length);
+    uint8_t readBPTAlgoCalibData(uint8_t *calibArray);
 
-    
     //@note maybe as private functions
     uint8_t loadBPTCalibVector();
     uint8_t EnableBPT_Algorithm(uint8_t mode);
