@@ -3,11 +3,12 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <algorithm>
 
 #define MAX32664_I2C_ADDRESS_DEFAULT 0x55
-#define MAX32664_COMMAND_DELAY 3
+#define MAX32664_COMMAND_DELAY 5
 #define CALIBVECTOR_SIZE 824
-
+#define CalibVectorSize 512
 struct MAX32664_Data
 {
     uint32_t ir;
@@ -33,7 +34,12 @@ struct MAX32664_Data_VerD
     uint8_t dia_bp;
     uint16_t spo2;
     uint16_t r_value;
-    uint8_t hr_resting_flag;
+    uint8_t pulse_flag;
+    uint16_t ibi;
+    uint8_t spo2_conf;
+    uint8_t bpt_report;
+    uint8_t spo2_report;
+    uint8_t end_bpt; //reserved not used
 };
 enum MAX32664_ReadStatusByteValue
 {
@@ -150,7 +156,7 @@ public:
     uint8_t ConfigureBPT_SensorAndAlgorithm();
     
     //@note maybe as private functions
-    uint8_t loadBPTCalibVector();
+    uint8_t loadBPTCalibVector(uint8_t *buffer, uint8_t buffer_size);
     uint8_t EnableBPT_Algorithm();
 
 private:

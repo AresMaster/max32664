@@ -425,9 +425,9 @@ uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint
     return status_byte;
 }
 
-uint8_t ReWire_MAX32664::loadBPTCalibVector()
+uint8_t ReWire_MAX32664::loadBPTCalibVector(uint8_t *buffer, uint16_t buffer_size)
 {
-    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::BPCalibrationData, calibVector, CALIBVECTOR_SIZE);
+    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::BPCalibrationData, buffer, buffer_size);
     return status;
 }
 
@@ -471,8 +471,8 @@ uint8_t ReWire_MAX32664::EnableBPT_Algorithm()
 
 uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sample)
 {
-    uint8_t read_length = 23;
-    uint8_t read_buffer[23] = {0};
+    uint8_t read_length = 29;
+    uint8_t read_buffer[29] = {0};
 
     // Read the sample
     uint8_t read_status = ReadOutputFifo(read_buffer, read_length);
@@ -499,6 +499,10 @@ uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sa
     uint16_t r_value = uint16_t(read_buffer[20]) << 8;
     r_value |= read_buffer[21];
     r_value /= 1000;
+
+    uint16_t ibi_value = uint16_t(read_buffer[23]) << 8;
+    ibi_value |= read_buffer[24];
+
     // Assign these values to the MAX32664_Data object
     sample.ir = ir_final;
     sample.red = red_final;
@@ -509,7 +513,11 @@ uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sa
     uint8_t sample.dia_bp = read_buffer[17];
     sample.spo2 = spo2;
     sample.r_value = r_value;
-    sample.hr_resting_flag = read_buffer[22];
+    sample.pulse_flag = read_buffer[22];
+    sample.ibi = ibi_value;
+    sample.spo2_conf = read_buffer[25];
+    sample.bpt_report = read_buffer[26];
+    sample.spo2_report = read_buffer[28];
     // Return the result of the read operation
     return read_status;
 }
@@ -520,25 +528,31 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     //   the document "measuring-heart-rate-and-spo2-using-the-max32664a.pdf".
 
     // Step 1.1: Load 824 bytes of BPT calibration vector data
-    uint8_t status_byte = loadBPTCalibVector();
-    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    for (uint8_t i = 0; i < 5; ++i)
     {
-        return status_byte;
-    }
-    delay(10);
+        write_multiple_bytes(0x50, 0x40, 0x08, i, 1);
+        uint8_t buffer[CalibVectorSize];
+        std::copy(calibVector, calibVector + CalibVectorSize, buffer);
 
+        uint8_t status_byte = loadBPTCalibVector(buffer, CalibVectorSize);
+        if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+        {
+            return status_byte;
+        }
+        delay(30);
+    }
     // Step 1.2: THIS STEP IS NOT NEEDED IN FW VER. 40.2.2 AND LATER.
     // Step 1.3: THIS STEP IS NOT NEEDED IN FW VER. 40.2.2 AND LATER.
 
     // Step 1.4: Set data and time as two 32-bit numbers for
     // YYMMDD and HHMMSS in little-endian format.
     // Provided example is for date:180828, time:163808.
-    status_byte = setDataTime();
-    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
-    {
-        return status_byte;
-    }
-    delay(10);
+    //status_byte = setDataTime();
+    //if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    //{
+    //    return status_byte;
+    //}
+    //delay(10);
     // Step 1.5: Set SpO_2 calibration coefficients as described in
     // the document. Provided example for:
     // A = 1.5958422, B = -34.659664, C = 112.68987
@@ -591,8 +605,8 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     }
 
     // Step 1.11: Enable the HR/SpO2 algorithm.
-    status_byte = EnableBPT_Algorithm(0x01);
-    delay(100);
+    status_byte = EnableBPT_Algorithm(0x02);
+    delay(600);
 
     // Return the result of the final operation
     return status_byte;

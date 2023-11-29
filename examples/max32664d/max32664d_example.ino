@@ -117,7 +117,15 @@ void loop()
                     Serial.print("\t");
                     Serial.print(current_sample.r_value);
                     Serial.print("\t");
-                    Serial.print(current_sample.hr_resting_flag);
+                    Serial.print(current_sample.pulse_flag);
+                    Serial.print("\t");
+                    Serial.print(current_sample.ibi);
+                    Serial.print("\t");
+                    Serial.print(current_sample.spo2_conf);
+                    Serial.print("\t");
+                    Serial.print(current_sample.bpt_report);
+                    Serial.print("\t");
+                    Serial.print(current_sample.spo2_report);
                     Serial.println("");
                 }
             }
