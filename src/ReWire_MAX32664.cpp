@@ -368,8 +368,7 @@ uint8_t ReWire_MAX32664::read_multiple_bytes(uint8_t data1, uint8_t data2, uint8
 
     wire_instance->requestFrom(max32664_i2c_address, read_length + 1);
     status_byte = wire_instance->read();
-
-    for (int i = 0; i < read_length; i++)
+    for (int i = 0; i < read_length; ++i)
     {
         read_buffer[i] = wire_instance->read();
         delayMicroseconds(10);
@@ -406,23 +405,23 @@ uint8_t ReWire_MAX32664::write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t
     return status_byte;
 }
 
-uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint8_t buffer_size)
+uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size)
 {
     wire_instance->beginTransmission(max32664_i2c_address);
     wire_instance->write(data1);
     wire_instance->write(data2);
     wire_instance->write(data3);
-    for (int i = 0; i < buffer_size; i++)
-    {
+    //wire_instance->write((const uint8_t *)buffer,(size_t) buffer_size);
+    for (uint16_t i = 0; i < buffer_size; ++i){
         wire_instance->write(buffer[i]);
         delayMicroseconds(1);
     }
-    wire_instance->endTransmission();
+        wire_instance->endTransmission();
     delay(MAX32664_COMMAND_DELAY);
 
     wire_instance->requestFrom(max32664_i2c_address, 1);
     uint8_t status_byte = wire_instance->read();
-    return status_byte;
+        return status_byte;
 }
 
 uint8_t ReWire_MAX32664::loadBPTCalibVector(uint8_t *buffer, uint16_t buffer_size)
@@ -444,7 +443,7 @@ uint8_t ReWire_MAX32664::loadSpo2Coefficients(float spo2CalibCoefA, float spo2Ca
     uint32_t A = spo2CalibCoefA * 100000;
     uint32_t B = spo2CalibCoefB * 100000;
     uint32_t C = spo2CalibCoefC * 100000;
-    uint8_t spo2CoefBuffer[12] = {};
+    uint8_t spo2CoefBuffer[12] = {0};
     spo2CoefBuffer[0] = (A & 0xff000000) >> 24;
     spo2CoefBuffer[1] = (A & 0x00ff0000) >> 16;
     spo2CoefBuffer[2] = (A & 0x0000ff00) >> 8;
@@ -464,9 +463,9 @@ uint8_t ReWire_MAX32664::loadSpo2Coefficients(float spo2CalibCoefA, float spo2Ca
     return status;
 }
 
-uint8_t ReWire_MAX32664::EnableBPT_Algorithm()
+uint8_t ReWire_MAX32664::EnableBPT_Algorithm(uint8_t mode)
 {
-    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x04, 0x02, 40 + 20);
+    return write_byte(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x04, mode);
 }
 
 uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sample)
@@ -509,8 +508,8 @@ uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sa
     sample.bp_status = read_buffer[12];
     sample.progress = read_buffer[13];
     sample.hr = hr;
-    uint8_t sample.sys_bp = read_buffer[16];
-    uint8_t sample.dia_bp = read_buffer[17];
+    sample.sys_bp = read_buffer[16];
+    sample.dia_bp = read_buffer[17];
     sample.spo2 = spo2;
     sample.r_value = r_value;
     sample.pulse_flag = read_buffer[22];
@@ -537,6 +536,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
         uint8_t status_byte = loadBPTCalibVector(buffer, CalibVectorSize);
         if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
         {
+            printf("CALIB VECTOR\r\n");
             return status_byte;
         }
         delay(30);
@@ -559,6 +559,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     status_byte = loadSpo2Coefficients(1.5958422, -34.659664, 112.68987); //@note Default values from documentation (change)
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("SPO2\r\n");
         return status_byte;
     }
     delay(10);
@@ -571,6 +572,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("OUTPUT FORMAT\r\n");
         return status_byte;
     }
 
@@ -581,16 +583,18 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("FIFO INTERRUPT\r\n");
+
         return status_byte;
     }
 
     // Step 1.9: Enable the AGC (automatic gain control)
-    status_byte = SetAlgorithmMode_EnableAGC(true);
+    status_byte = SetAlgorithmMode_EnableAGC(false);
     delay(200);
-
-    // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("ENABLE AGC\r\n");
+
         return status_byte;
     }
 
@@ -601,6 +605,103 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Check to make sure the operation was successful
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
+        printf("ENABLE SENSOR\r\n");
+
+        return status_byte;
+    }
+
+    // Step 1.11: Enable the BPT Estimation algorithm.
+    status_byte = EnableBPT_Algorithm(0x02);
+    if (status_byte == MAX32664_ReadStatusByteValue::ERR_TRY_AGAIN)
+    {
+        do
+        {
+            delay(10);
+            status_byte = EnableBPT_Algorithm(0x02);
+        } while (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS);
+    }
+    else if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE BPT\r\n");
+    }
+    delay(100);
+   
+    // Return the result of the final operation
+    return status_byte;
+}
+
+uint8_t ReWire_MAX32664::ConfigureBPT_RawValue()
+{
+    // In this function, we are following the steps outlined in Table 8 (section 3.2) of
+    //   the document "measuring-heart-rate-and-spo2-using-the-max32664a.pdf".
+
+    // Step 1.7: Set output mode to sensor + algorithm data
+    //(streamed data will include PPG and algorithm data).
+    uint8_t status_byte = SetOutputMode_OutputFormat(MAX32664_OutputModeFormat::SensorData);
+    delay(10);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("OUTPUT FORMAT\r\n");
+        return status_byte;
+    }
+
+    // Step 1.8: Set sensor hub interrupt threshold to 0x0F (the value used in the datasheet example).
+    status_byte = SetOutputMode_FifoInterruptThreshold(0x0F);
+    delay(10);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("FIFO INTERRUPT\r\n");
+
+        return status_byte;
+    }
+
+    // Step 1.10: Enable the AFE ("analog front end" - the MAX30101 in this case)
+    status_byte = EnableSensor(true);
+    delay(1);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE SENSOR\r\n");
+
+        return status_byte;
+    }
+
+    // Step 1.11: Enable the BPT Estimation algorithm.
+    status_byte = EnableBPT_Algorithm(0x02);
+
+    if (status_byte == MAX32664_ReadStatusByteValue::ERR_TRY_AGAIN)
+    {
+        do
+        {
+            delay(10);
+            status_byte = EnableBPT_Algorithm(0x02);
+        } while (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS);
+    }
+    else if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE BPT ALGO\r\n");
+    }
+    // Step 1.9: Enable the AGC (automatic gain control)
+    status_byte = SetAlgorithmMode_EnableAGC(false);
+
+    // Check to make sure the operation was successful
+    if (status_byte == MAX32664_ReadStatusByteValue::ERR_TRY_AGAIN)
+    {
+        do
+        {
+            delay(10);
+            status_byte = SetAlgorithmMode_EnableAGC(false);
+        } while (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS);
+    }
+    else if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE AGC\r\n");
+
         return status_byte;
     }
 
@@ -609,5 +710,73 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     delay(600);
 
     // Return the result of the final operation
+    return status_byte;
+}
+
+uint8_t ReWire_MAX32664::ReadSample_BPTSensor(MAX32664_Data_VerD &sample)
+{
+    uint8_t read_length = 12;
+    uint8_t read_buffer[12] = {0};
+
+    // Read the sample
+    uint8_t read_status = ReadOutputFifo(read_buffer, read_length);
+
+    // Parse the sample
+    uint32_t ir0 = ((uint32_t)read_buffer[0]) << 16;
+    uint32_t ir1 = ((uint32_t)read_buffer[1]) << 8;
+    uint32_t ir2 = ((uint32_t)read_buffer[2]);
+    uint32_t ir_final = (uint32_t)(ir0 | ir1 | ir2) / 10;
+
+    uint32_t red0 = ((uint32_t)read_buffer[3]) << 16;
+    uint32_t red1 = ((uint32_t)read_buffer[4]) << 8;
+    uint32_t red2 = ((uint32_t)read_buffer[5]);
+    uint32_t red_final = (uint32_t)(red0 | red1 | red2) / 10;
+
+    // Assign these values to the MAX32664_Data object
+    sample.ir = ir_final;
+    sample.red = red_final;
+    sample.bp_status = 0;
+    sample.progress = 0;
+    sample.hr = 0;
+    sample.sys_bp = 0;
+    sample.dia_bp = 0;
+    sample.spo2 = 0;
+    sample.r_value = 0;
+    sample.hr_resting_flag = 0;
+    // Return the result of the read operation
+    return read_status;
+}
+
+uint8_t ReWire_MAX32664::getMCUType(uint8_t &return_byte){
+
+    uint8_t status_byte = read_byte(0xFF, 0x00, return_byte);
+    return status_byte;
+}
+
+uint8_t ReWire_MAX32664::readBPTAlgoCalibData(uint8_t *calibArray)
+{
+
+    uint8_t status = read_multiple_bytes(0x51, 0x04, 0x03, calibArray, CALIBVECTOR_SIZE);
+    return status;
+}
+
+uint8_t ReWire_MAX32664::read_multiple_bytes(uint8_t data1, uint8_t data2,uint8_t data3, uint8_t *read_buffer, uint16_t read_length)
+{
+    uint8_t status_byte;
+
+    wire_instance->beginTransmission(max32664_i2c_address);
+    wire_instance->write(data1);
+    wire_instance->write(data2);
+    wire_instance->write(data3);
+    wire_instance->endTransmission();
+    delay(MAX32664_COMMAND_DELAY);
+
+    wire_instance->requestFrom16(max32664_i2c_address, read_length + 1, 0, 0, true);
+    status_byte = wire_instance->read();
+    for (uint16_t i = 0; i < read_length; ++i)
+    {
+        read_buffer[i] = wire_instance->read();
+    }
+
     return status_byte;
 }
