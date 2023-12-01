@@ -7,8 +7,7 @@
 
 #define MAX32664_I2C_ADDRESS_DEFAULT 0x55
 #define MAX32664_COMMAND_DELAY 5
-#define CALIBVECTOR_SIZE 824
-#define CalibVectorSize 512
+#define CALIBVECTOR_SIZE 512
 struct MAX32664_Data
 {
     uint32_t ir;
@@ -39,7 +38,7 @@ struct MAX32664_Data_VerD
     uint8_t spo2_conf;
     uint8_t bpt_report;
     uint8_t spo2_report;
-    uint8_t end_bpt; //reserved not used
+    uint8_t end_bpt; // reserved not used
 };
 enum MAX32664_ReadStatusByteValue
 {
@@ -160,7 +159,7 @@ public:
     uint8_t read_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data_3, uint8_t *read_buffer, uint16_t read_length);
     uint8_t readBPTAlgoCalibData(uint8_t *calibArray);
     uint8_t Configure_BPTCalibrationMode();
-    uint8_t Start_BPTCalibrationMode(uint8_t calIndex,uint8_t systolicValue,uint8_t dystolicValue);
+    uint8_t Start_BPTCalibrationMode(uint8_t calIndex, uint8_t systolicValue, uint8_t dystolicValue);
 
     //@note maybe as private functions
     uint8_t loadBPTCalibVector(uint8_t *buffer, uint16_t buffer_size);
@@ -174,8 +173,8 @@ private:
     uint8_t write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t data2, uint8_t data3, uint16_t cmd_delay);
     uint8_t write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size);
     uint8_t write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size, uint16_t cmd_delay);
-    uint8_t setCalibrationIndex(uint8_t calIndex,uint8_t systolicValue,uint8_t dystolicValue);
+    uint8_t setCalibrationIndex(uint8_t calIndex, uint8_t systolicValue, uint8_t dystolicValue);
     uint8_t setCalibrationIndex(uint8_t calIndex);
-    };
+};
 
 #endif /* __REWIRE_MAX32664_H */
