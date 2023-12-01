@@ -29,13 +29,13 @@ struct MAX32664_Data_VerD
     uint32_t red;
     uint8_t bp_status;
     uint8_t progress;
-    uint16_t hr;
+    float hr;
     uint8_t sys_bp;
     uint8_t dia_bp;
-    uint16_t spo2;
-    uint16_t r_value;
+    float spo2;
+    float r_value;
     uint8_t pulse_flag;
-    uint16_t ibi;
+    float ibi;
     uint8_t spo2_conf;
     uint8_t bpt_report;
     uint8_t spo2_report;
@@ -159,9 +159,11 @@ public:
     uint8_t getMCUType(uint8_t &return_byte);
     uint8_t read_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data_3, uint8_t *read_buffer, uint16_t read_length);
     uint8_t readBPTAlgoCalibData(uint8_t *calibArray);
+    uint8_t Configure_BPTCalibrationMode();
+    uint8_t Start_BPTCalibrationMode(uint8_t calIndex,uint8_t systolicValue,uint8_t dystolicValue);
 
     //@note maybe as private functions
-    uint8_t loadBPTCalibVector(uint8_t *buffer, uint8_t buffer_size);
+    uint8_t loadBPTCalibVector(uint8_t *buffer, uint16_t buffer_size);
     uint8_t EnableBPT_Algorithm(uint8_t mode);
 
 private:
@@ -169,8 +171,11 @@ private:
     uint8_t read_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t *read_buffer, uint8_t read_length);
 
     uint8_t write_byte(uint8_t data1, uint8_t data2, uint8_t data3);
-    uint8_t write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t cmd_delay);
+    uint8_t write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t data2, uint8_t data3, uint16_t cmd_delay);
     uint8_t write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size);
+    uint8_t write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size, uint16_t cmd_delay);
+    uint8_t setCalibrationIndex(uint8_t calIndex,uint8_t systolicValue,uint8_t dystolicValue);
+    uint8_t setCalibrationIndex(uint8_t calIndex);
     };
 
 #endif /* __REWIRE_MAX32664_H */

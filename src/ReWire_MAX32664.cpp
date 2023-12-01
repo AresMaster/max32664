@@ -292,7 +292,7 @@ uint8_t ReWire_MAX32664::SetOutputMode_FifoInterruptThreshold(uint8_t interrupt_
 /// @return the status byte of the write operation
 uint8_t ReWire_MAX32664::SetAlgorithmMode_EnableAGC(bool enable)
 {
-    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x00, enable, 20 + 20);
+    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x00, enable, 20);
 }
 
 /// @brief Enable the MAX30101 sensor
@@ -300,7 +300,7 @@ uint8_t ReWire_MAX32664::SetAlgorithmMode_EnableAGC(bool enable)
 /// @return the status byte of the write operation
 uint8_t ReWire_MAX32664::EnableSensor(bool enable)
 {
-    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableSensorMode, 0x03, enable, 40 + 20);
+    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableSensorMode, 0x03, enable, 40);
 }
 
 /// @brief Enable the WHRM MaximFast algorithm.
@@ -371,7 +371,7 @@ uint8_t ReWire_MAX32664::read_multiple_bytes(uint8_t data1, uint8_t data2, uint8
     for (int i = 0; i < read_length; ++i)
     {
         read_buffer[i] = wire_instance->read();
-        delayMicroseconds(10);
+        delayMicroseconds(1);
     }
 
     return status_byte;
@@ -391,7 +391,7 @@ uint8_t ReWire_MAX32664::write_byte(uint8_t data1, uint8_t data2, uint8_t data3)
     return status_byte;
 }
 
-uint8_t ReWire_MAX32664::write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t cmd_delay)
+uint8_t ReWire_MAX32664::write_byte_with_custom_cmd_delay(uint8_t data1, uint8_t data2, uint8_t data3, uint16_t cmd_delay)
 {
     wire_instance->beginTransmission(max32664_i2c_address);
     wire_instance->write(data1);
@@ -411,38 +411,57 @@ uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint
     wire_instance->write(data1);
     wire_instance->write(data2);
     wire_instance->write(data3);
-    //wire_instance->write((const uint8_t *)buffer,(size_t) buffer_size);
-    for (uint16_t i = 0; i < buffer_size; ++i){
+    // wire_instance->write((const uint8_t *)buffer,(size_t) buffer_size);
+    for (uint16_t i = 0; i < buffer_size; ++i)
+    {
         wire_instance->write(buffer[i]);
         delayMicroseconds(1);
     }
-        wire_instance->endTransmission();
+    wire_instance->endTransmission();
     delay(MAX32664_COMMAND_DELAY);
 
     wire_instance->requestFrom(max32664_i2c_address, 1);
     uint8_t status_byte = wire_instance->read();
-        return status_byte;
+    return status_byte;
 }
+uint8_t ReWire_MAX32664::write_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *buffer, uint16_t buffer_size, uint16_t cmd_delay)
+{
+    wire_instance->beginTransmission(max32664_i2c_address);
+    wire_instance->write(data1);
+    wire_instance->write(data2);
+    wire_instance->write(data3);
+    wire_instance->write((const uint8_t *)buffer,(size_t) buffer_size);
+    /*for (uint16_t i = 0; i < buffer_size; ++i)
+    {
+        wire_instance->write(buffer[i]);
+        delayMicroseconds(1);
+    }*/
+    wire_instance->endTransmission();
+    delay(cmd_delay);
 
+    wire_instance->requestFrom(max32664_i2c_address, 1);
+    uint8_t status_byte = wire_instance->read();
+    return status_byte;
+}
 uint8_t ReWire_MAX32664::loadBPTCalibVector(uint8_t *buffer, uint16_t buffer_size)
 {
-    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::BPCalibrationData, buffer, buffer_size);
+    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::BPCalibrationData, buffer, buffer_size, 30);
     return status;
 }
 
 uint8_t ReWire_MAX32664::setDataTime()
 {
-    uint8_t dateTimeBuffer[8] = {0x5c, 0xc2, 0x02, 0x00, 0xe0, 0x7f, 0x02, 0x00}; // @note Default value from user guide need to change
-    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::SetDateAndTime, dateTimeBuffer, 8);
+    uint8_t dateTimeBuffer[8] = {0xFE, 0xA1, 0x33, 0x01, 0xE0, 0xDF, 0x01, 0x00}; // @note Default value from user guide need to change
+    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::SetDateAndTime, dateTimeBuffer, 8,5);
 
     return status;
 }
 
 uint8_t ReWire_MAX32664::loadSpo2Coefficients(float spo2CalibCoefA, float spo2CalibCoefB, float spo2CalibCoefC)
 {
-    uint32_t A = spo2CalibCoefA * 100000;
-    uint32_t B = spo2CalibCoefB * 100000;
-    uint32_t C = spo2CalibCoefC * 100000;
+    int32_t A = spo2CalibCoefA * 100000;
+    int32_t B = spo2CalibCoefB * 100000;
+    int32_t C = spo2CalibCoefC * 100000;
     uint8_t spo2CoefBuffer[12] = {0};
     spo2CoefBuffer[0] = (A & 0xff000000) >> 24;
     spo2CoefBuffer[1] = (A & 0x00ff0000) >> 16;
@@ -458,14 +477,15 @@ uint8_t ReWire_MAX32664::loadSpo2Coefficients(float spo2CalibCoefA, float spo2Ca
     spo2CoefBuffer[9] = (C & 0x00ff0000) >> 16;
     spo2CoefBuffer[10] = (C & 0x0000ff00) >> 8;
     spo2CoefBuffer[11] = (C & 0x000000ff);
-    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::SpO2CalibrationCoefficients, spo2CoefBuffer, 12);
+
+    uint8_t status = write_multiple_bytes(MAX32664_CommandFamilyByte::SetAlgorithmConfiguration, 0x04, MAX32664_ConfigrationIndex::SpO2CalibrationCoefficients, spo2CoefBuffer, 12, 5);
 
     return status;
 }
 
 uint8_t ReWire_MAX32664::EnableBPT_Algorithm(uint8_t mode)
 {
-    return write_byte(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x04, mode);
+    return write_byte_with_custom_cmd_delay(MAX32664_CommandFamilyByte::EnableAlgorithm, 0x04, mode, 600);
 }
 
 uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sample)
@@ -489,15 +509,15 @@ uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sa
 
     uint16_t hr = (uint16_t(read_buffer[14]) << 8);
     hr |= (read_buffer[15]);
-    hr /= 10;
+    // hr /= 10;
 
     uint16_t spo2 = uint16_t(read_buffer[18]) << 8;
     spo2 |= read_buffer[19];
-    spo2 /= 10;
+    // spo2 /= 10;
 
     uint16_t r_value = uint16_t(read_buffer[20]) << 8;
     r_value |= read_buffer[21];
-    r_value /= 1000;
+    // r_value /= 1000;
 
     uint16_t ibi_value = uint16_t(read_buffer[23]) << 8;
     ibi_value |= read_buffer[24];
@@ -507,11 +527,11 @@ uint8_t ReWire_MAX32664::ReadSample_BPTSensorAndAlgorithm(MAX32664_Data_VerD &sa
     sample.red = red_final;
     sample.bp_status = read_buffer[12];
     sample.progress = read_buffer[13];
-    sample.hr = hr;
+    sample.hr = hr / 10;
     sample.sys_bp = read_buffer[16];
     sample.dia_bp = read_buffer[17];
-    sample.spo2 = spo2;
-    sample.r_value = r_value;
+    sample.spo2 = spo2 / 10;
+    sample.r_value = r_value / 1000;
     sample.pulse_flag = read_buffer[22];
     sample.ibi = ibi_value;
     sample.spo2_conf = read_buffer[25];
@@ -527,13 +547,20 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     //   the document "measuring-heart-rate-and-spo2-using-the-max32664a.pdf".
 
     // Step 1.1: Load 824 bytes of BPT calibration vector data
+    uint8_t status_byte = 255;
     for (uint8_t i = 0; i < 5; ++i)
     {
-        write_multiple_bytes(0x50, 0x40, 0x08, i, 1);
+        status_byte = setCalibrationIndex(i);
+         if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+        {
+            printf("setCalibrationIndex\r\n");
+            return status_byte;
+        }
         uint8_t buffer[CalibVectorSize];
         std::copy(calibVector, calibVector + CalibVectorSize, buffer);
 
-        uint8_t status_byte = loadBPTCalibVector(buffer, CalibVectorSize);
+        status_byte = loadBPTCalibVector(buffer, CalibVectorSize);
+        printf("LOAD CALIB VECTOR %d\r\n", i + 1);
         if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
         {
             printf("CALIB VECTOR\r\n");
@@ -547,12 +574,12 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     // Step 1.4: Set data and time as two 32-bit numbers for
     // YYMMDD and HHMMSS in little-endian format.
     // Provided example is for date:180828, time:163808.
-    //status_byte = setDataTime();
-    //if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
-    //{
+    // status_byte = setDataTime();
+    // if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    // {
     //    return status_byte;
-    //}
-    //delay(10);
+    // }
+    // delay(10);
     // Step 1.5: Set SpO_2 calibration coefficients as described in
     // the document. Provided example for:
     // A = 1.5958422, B = -34.659664, C = 112.68987
@@ -589,8 +616,8 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
     }
 
     // Step 1.9: Enable the AGC (automatic gain control)
-    status_byte = SetAlgorithmMode_EnableAGC(false);
-    delay(200);
+    status_byte = SetAlgorithmMode_EnableAGC(true);
+    delay(20);
     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
     {
         printf("ENABLE AGC\r\n");
@@ -625,7 +652,7 @@ uint8_t ReWire_MAX32664::ConfigureBPT_SensorAndAlgorithm()
         printf("ENABLE BPT\r\n");
     }
     delay(100);
-   
+
     // Return the result of the final operation
     return status_byte;
 }
@@ -742,12 +769,13 @@ uint8_t ReWire_MAX32664::ReadSample_BPTSensor(MAX32664_Data_VerD &sample)
     sample.dia_bp = 0;
     sample.spo2 = 0;
     sample.r_value = 0;
-    sample.hr_resting_flag = 0;
+    sample.pulse_flag = 0;
     // Return the result of the read operation
     return read_status;
 }
 
-uint8_t ReWire_MAX32664::getMCUType(uint8_t &return_byte){
+uint8_t ReWire_MAX32664::getMCUType(uint8_t &return_byte)
+{
 
     uint8_t status_byte = read_byte(0xFF, 0x00, return_byte);
     return status_byte;
@@ -760,7 +788,7 @@ uint8_t ReWire_MAX32664::readBPTAlgoCalibData(uint8_t *calibArray)
     return status;
 }
 
-uint8_t ReWire_MAX32664::read_multiple_bytes(uint8_t data1, uint8_t data2,uint8_t data3, uint8_t *read_buffer, uint16_t read_length)
+uint8_t ReWire_MAX32664::read_multiple_bytes(uint8_t data1, uint8_t data2, uint8_t data3, uint8_t *read_buffer, uint16_t read_length)
 {
     uint8_t status_byte;
 
@@ -771,7 +799,7 @@ uint8_t ReWire_MAX32664::read_multiple_bytes(uint8_t data1, uint8_t data2,uint8_
     wire_instance->endTransmission();
     delay(MAX32664_COMMAND_DELAY);
 
-    wire_instance->requestFrom16(max32664_i2c_address, read_length + 1, 0, 0, true);
+    wire_instance->requestFrom(max32664_i2c_address, read_length + 1, 0, 0, true);
     status_byte = wire_instance->read();
     for (uint16_t i = 0; i < read_length; ++i)
     {
@@ -779,4 +807,106 @@ uint8_t ReWire_MAX32664::read_multiple_bytes(uint8_t data1, uint8_t data2,uint8_
     }
 
     return status_byte;
+}
+
+uint8_t ReWire_MAX32664::Configure_BPTCalibrationMode()
+{
+    //uint8_t device_mode = 255;
+    //ReadDeviceMode(device_mode);
+   // printf("DEVICE MODE BEFORE %d\r\n",device_mode);
+    //uint8_t buffer[1] = {0};
+    //write_multiple_bytes(0x50,0x04,0x00,buffer,1);
+    //write_multiple_bytes(0x50,0x04,0x05,buffer,1);
+    uint8_t status_byte = setDataTime();
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        return status_byte;
+    }
+    status_byte = SetOutputMode_OutputFormat(MAX32664_OutputModeFormat::SensorData_And_AlgorithmData);
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        return status_byte;
+    }
+    status_byte = SetOutputMode_FifoInterruptThreshold(0x0F);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("FIFO INTERRUPT\r\n");
+
+        return status_byte;
+    }
+    
+
+    status_byte = SetAlgorithmMode_EnableAGC(true);
+
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE AGC\r\n");
+
+        return status_byte;
+    }
+
+    // Step 1.10: Enable the AFE ("analog front end" - the MAX30101 in this case)
+    status_byte = EnableSensor(true);
+
+    // Check to make sure the operation was successful
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE SENSOR\r\n");
+
+        return status_byte;
+    }
+/*
+    device_mode = 255;
+    ReadDeviceMode(device_mode);
+    printf("DEVICE MODE AFTER %d\r\n",device_mode);
+
+    uint8_t part_id[1] = {255};
+    read_multiple_bytes(0x41,0x03,0xFF,part_id,1);
+     if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ERROR MAX30101 PART ID\r\n");
+
+        return status_byte;
+    }else{
+        printf("MAX30101 PART ID %d\r\n",part_id[0]);
+    }*/
+    return status_byte;
+}
+uint8_t ReWire_MAX32664::Start_BPTCalibrationMode(uint8_t calIndex,uint8_t systolicValue,uint8_t dystolicValue){
+    uint8_t status_byte = setCalibrationIndex(calIndex,systolicValue,dystolicValue);
+    if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("CALL INDEX\r\n");
+
+        return status_byte;
+    }
+    delay(10);
+
+    status_byte = EnableBPT_Algorithm(0x01);
+
+    if (status_byte == MAX32664_ReadStatusByteValue::ERR_TRY_AGAIN)
+    {
+        do
+        {
+            delay(10);
+            status_byte = EnableBPT_Algorithm(0x01);
+        } while (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS);
+    }
+    else if (status_byte != MAX32664_ReadStatusByteValue::SUCCESS_STATUS)
+    {
+        printf("ENABLE BPT ALGO\r\n");
+    }
+    delay(100);
+    return status_byte;
+}
+
+uint8_t ReWire_MAX32664::setCalibrationIndex(uint8_t calIndex,uint8_t systolicValue,uint8_t dystolicValue){
+        uint8_t buffer[3] = {calIndex,systolicValue,dystolicValue};
+         return write_multiple_bytes(0x50, 0x04, 0x07, buffer, 3, 5);
+}
+uint8_t ReWire_MAX32664::setCalibrationIndex(uint8_t calIndex){
+        uint8_t buffer[1] = {calIndex};
+         return write_multiple_bytes(0x50, 0x04, 0x08, buffer, 1, 5);
 }
